@@ -1,0 +1,8 @@
+[app]
+name = "cargo-mobile"
+stylized-name = "Cargo Mobile"
+domain = "www.cactice.com"
+template-pack = "wgpu"
+
+[apple]
+development-team = "29BWQ53ETH"
