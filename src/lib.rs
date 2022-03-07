@@ -44,9 +44,9 @@ async fn init(
 ) {
     let size = window.inner_size();
     // conditional backends as workaround for https://github.com/gfx-rs/wgpu/issues/2384
-    // #[cfg(all(target_arch = "x86_64", target_os = "android"))]
-    // let backends = wgpu::Backends::GL;
-    // #[cfg(not(all(target_arch = "x86_64", target_os = "android")))]
+    #[cfg(all(target_arch = "x86_64", target_os = "android"))]
+    let backends = wgpu::Backends::GL;
+    #[cfg(not(all(target_arch = "x86_64", target_os = "android")))]
     let backends = wgpu::Backends::all();
     let instance = wgpu::Instance::new(backends);
     let surface = unsafe { instance.create_surface(&window) };
