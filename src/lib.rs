@@ -5,7 +5,7 @@ use pollster::FutureExt;
 use std::{borrow::Cow, time::Instant};
 use wgpu::{
     Adapter, Device, PipelineLayout, Queue, RenderBundle, RenderPipeline, ShaderModule, Surface,
-    SurfaceConfiguration,
+    SurfaceConfiguration, TextureFormat,
 };
 use winit::{
     event::{Event, WindowEvent},
@@ -42,13 +42,14 @@ async fn init(
     Queue,
     RenderPipeline,
 ) {
-    info!("init start!!");
     let size = window.inner_size();
-    info!("{:?}", size);
-    let instance = wgpu::Instance::new(wgpu::Backends::all());
-    info!("instance ready");
+    // conditional backends as workaround for https://github.com/gfx-rs/wgpu/issues/2384
+    // #[cfg(all(target_arch = "x86_64", target_os = "android"))]
+    // let backends = wgpu::Backends::GL;
+    // #[cfg(not(all(target_arch = "x86_64", target_os = "android")))]
+    let backends = wgpu::Backends::all();
+    let instance = wgpu::Instance::new(backends);
     let surface = unsafe { instance.create_surface(&window) };
-    info!("surface ready");
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -59,7 +60,6 @@ async fn init(
         .await
         .expect("Failed to find an appropriate adapter");
 
-    info!("adapter ready");
     // Create the logical device and command queue
     let (device, queue) = adapter
         .request_device(
@@ -85,7 +85,7 @@ async fn init(
         push_constant_ranges: &[],
     });
 
-    let swapchain_format = surface
+    let texture_format = surface
         .get_preferred_format(&adapter)
         .expect("Failed to get preferred_format");
 
@@ -100,7 +100,7 @@ async fn init(
         fragment: Some(wgpu::FragmentState {
             module: &shader,
             entry_point: "fs_main",
-            targets: &[swapchain_format.into()],
+            targets: &[texture_format.into()],
         }),
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: None,
@@ -110,7 +110,7 @@ async fn init(
 
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: swapchain_format,
+        format: texture_format,
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::Fifo,
@@ -201,19 +201,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     render_pipeline,
                 ) = init_some(&window).block_on();
             }
-            // Event::WindowEvent {
-            //     event: WindowEvent::Resized(size),
-            //     ..
-            // } => {
-            //     if let (Some(mut config), Some(surface), Some(device)) =
-            //         (config.as_ref(), surface.as_ref(), device.as_ref())
-            //     {
-            //         // Reconfigure the surface with the new size
-            //         config.width = size.width;
-            //         config.height = size.height;
-            //         surface.configure(&device, &config);
-            //     }
-            // }
+            Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                if let (Some(config), Some(surface), Some(device)) =
+                    (config.as_mut(), surface.as_ref(), device.as_ref())
+                {
+                    // Reconfigure the surface with the new size
+                    config.width = size.width;
+                    config.height = size.height;
+                    surface.configure(&device, &config);
+                }
+            }
             Event::RedrawRequested(_) => {
                 if let (Some(surface), Some(device), Some(render_pipeline), Some(queue)) =
                     (&surface, &device, &render_pipeline, &queue)
@@ -290,7 +290,6 @@ fn init_logging() {
 #[cfg(not(target_os = "android"))]
 fn init_logging() {
     env_logger::init();
-    // wgpu_subscriber::initialize_default_subscriber(None);
 }
 
 #[mobile_entry_point]
